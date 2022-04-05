@@ -30,7 +30,7 @@ extern "C" {
 #endif
 
 #if BT_DBG_ENABLED
-#define LOG_LEVEL LOG_LEVEL_DBG
+#define LOG_LEVEL LOG_LEVEL_INF
 #else
 #define LOG_LEVEL CONFIG_BT_LOG_LEVEL
 #endif

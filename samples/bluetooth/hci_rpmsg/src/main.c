@@ -254,7 +254,7 @@ void main(void)
 	static K_FIFO_DEFINE(rx_queue);
 
 	LOG_DBG("Start");
-
+	LOG_INF("FW_INFO_FIRMWARE_VERSION %d", CONFIG_FW_INFO_FIRMWARE_VERSION);
 	/* Enable the raw interface, this will in turn open the HCI driver */
 	bt_enable_raw(&rx_queue);
 
