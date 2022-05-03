@@ -867,6 +867,18 @@ struct bt_ots_client_cb {
 	void (*obj_metadata_read)(struct bt_ots_client *ots_inst,
 				  struct bt_conn *conn, int err,
 				  uint8_t metadata_read);
+	/** @brief Callback function for the data of the write
+	 * object.
+	 *
+	 *  Called when the data of the selected object are read using
+	 *  bt_ots_client_write_object_data().
+	 *
+	 *  @param ots_inst      Pointer to the OTC instance.
+	 *  @param conn          The connection to the peer device.
+	 *  @param len           Length of the written data.
+	 */
+	void (*obj_data_written)(struct bt_ots_client *ots_inst,
+			     struct bt_conn *conn, uint32_t len);
 };
 
 /** @brief Register an Object Transfer Service Instance.
@@ -987,6 +999,25 @@ int bt_ots_client_read_object_metadata(struct bt_ots_client *otc_inst,
  */
 int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 				   struct bt_conn *conn);
+
+/** @brief Write the data of the current selected object.
+ *
+ *  This will trigger an OACP write operation for the current size of the object
+ *  with a specified offset and then expect transfering the content via the L2CAP CoC.
+ *
+ *  The data of the object are returned in the obj_data_read() callback.
+ *
+ *  @param otc_inst     Pointer to the OTC instance.
+ *  @param conn         Pointer to the connection object.
+ *	@param buf			Pointer to the data buffer to be written.
+ *	@param len			Size of data.
+ *	@param offset		Offset to write, usually 0.
+*	@param mode			Mode: Currently only Truncate or not.
+ *  @return int         0 if success, ERRNO on failure.
+ */
+int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst,
+				   struct bt_conn *conn, uint8_t *buf,size_t len,
+			   off_t offset, uint8_t mode);
 
 /** @brief Directory listing object metadata callback
  *
