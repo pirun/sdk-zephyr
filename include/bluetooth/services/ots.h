@@ -988,6 +988,24 @@ int bt_ots_client_read_object_metadata(struct bt_ots_client *otc_inst,
 int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 				   struct bt_conn *conn);
 
+/** @brief Write the data of the current selected object.
+ *
+ *  This will trigger an OACP write operation for the current size of the object
+ *  with a specified offset and then expect transfering the content via the L2CAP CoC.
+ *
+ *  The data of the object are returned in the obj_data_read() callback.
+ *
+ *  @param otc_inst     Pointer to the OTC instance.
+ *  @param conn         Pointer to the connection object.
+ *	@param buf			Pointer to the data buffer to be written.
+ *	@param len			Size of data.
+ *	@param offset		Offset to write, usually 0.
+ *  @return int         0 if success, ERRNO on failure.
+ */
+int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst,
+				   struct bt_conn *conn, uint8_t *buf,size_t len,
+			   off_t offset);
+
 /** @brief Directory listing object metadata callback
  *
  * If a directory listing is decoded using bt_ots_client_decode_dirlisting(),

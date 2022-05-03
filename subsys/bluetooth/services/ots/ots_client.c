@@ -120,6 +120,9 @@ static struct bt_otc_internal_instance_t *cur_inst;
 
 static int oacp_read(struct bt_conn *conn,
 		     struct bt_otc_internal_instance_t *inst);
+static int oacp_write(struct bt_conn *conn,
+		     struct bt_otc_internal_instance_t *inst,
+			 uint8_t *buf, size_t len, off_t offset);
 static void read_next_metadata(struct bt_conn *conn,
 			       struct bt_otc_internal_instance_t *inst);
 static int read_attr(struct bt_conn *conn,
@@ -130,8 +133,14 @@ static int read_attr(struct bt_conn *conn,
 static void tx_done(struct bt_gatt_ots_l2cap *l2cap_ctx,
 		    struct bt_conn *conn)
 {
+	int err;
 	/* Not doing any writes yet */
 	BT_ERR("Unexpected call, context: %p, conn: %p", l2cap_ctx, (void *)conn);
+	err = bt_gatt_ots_l2cap_disconnect(l2cap_ctx);
+	if (err < 0) {
+		BT_WARN("Disconnecting L2CAP returned error %d", err);
+	}
+	cur_inst = NULL;
 }
 
 static ssize_t rx_done(struct bt_gatt_ots_l2cap *l2cap_ctx,
@@ -604,7 +613,6 @@ int bt_ots_client_select_first(struct bt_ots_client *otc_inst,
 		} else if (inst->busy) {
 			return -EBUSY;
 		}
-
 		return write_olcp(inst, conn, BT_GATT_OTS_OLCP_PROC_FIRST,
 				  NULL, 0);
 	}
@@ -1095,6 +1103,25 @@ static void write_oacp_cp_cb(struct bt_conn *conn, uint8_t err,
 
 	inst->busy = false;
 }
+static void write_oacp_cp_write_req_cb(struct bt_conn *conn, uint8_t err,
+			     struct bt_gatt_write_params *params)
+{
+	struct bt_otc_internal_instance_t *inst =
+		lookup_inst_by_handle(params->handle);
+	uint32_t len = inst->l2cap_ctx.tx.len;
+
+	BT_DBG("Write Object request %s (0x%02X)", err ? "failed" : "successful", err);
+	BT_DBG("Now we can call l2cap to transfer data");
+	inst->l2cap_ctx.tx.len = 0;
+	err = bt_gatt_ots_l2cap_send(&inst->l2cap_ctx, inst->l2cap_ctx.tx.data, len);
+
+	if (!inst) {
+		BT_ERR("Instance not found");
+		return;
+	}
+
+	inst->busy = false;
+}
 
 static int oacp_read(struct bt_conn *conn,
 		     struct bt_otc_internal_instance_t *inst)
@@ -1156,7 +1183,76 @@ static int oacp_read(struct bt_conn *conn,
 
 	return err;
 }
+static int oacp_write(struct bt_conn *conn,
+		     struct bt_otc_internal_instance_t *inst,
+			 uint8_t *buf, size_t len, off_t offset)
+{
+	int err;
+	struct bt_gatt_ots_l2cap *l2cap;
 
+	LOG_DBG("");
+	if (!inst->otc_inst->oacp_handle) {
+		BT_DBG("Handle not set");
+		return -EINVAL;
+	} else if (inst->busy) {
+		return -EBUSY;
+	} else if (cur_inst) {
+		return -EBUSY;
+	}
+
+	/* TODO: How do we ensure that the L2CAP is connected in time for the
+	 * transfer?
+	 */
+
+	//err = bt_gatt_ots_l2cap_connect(conn, &l2cap);
+	err = bt_gatt_ots_l2cap_connect(conn, &inst->l2cap_ctx);
+	if (err) {
+		BT_DBG("Could not connect l2cap: %d", err);
+		return err;
+	}
+	// l2cap->tx_done = tx_done;
+	// l2cap->rx_done = rx_done;
+	// l2cap->closed  = chan_closed;
+	// l2cap->tx.data = buf;
+	// l2cap->tx.len = len;
+	inst->l2cap_ctx.tx_done = tx_done;
+	inst->l2cap_ctx.rx_done = rx_done;
+	inst->l2cap_ctx.closed  = chan_closed;
+	inst->l2cap_ctx.tx.data = buf;
+	inst->l2cap_ctx.tx.len = len;
+
+	net_buf_simple_reset(&otc_tx_buf);
+
+	/* OP Code */
+	net_buf_simple_add_u8(&otc_tx_buf, BT_GATT_OTS_OACP_PROC_WRITE);
+
+	/* Offset */
+	net_buf_simple_add_le32(&otc_tx_buf, offset);
+
+	/* Len */
+	net_buf_simple_add_le32(&otc_tx_buf, len);
+	/* Mode, default no truncate*/
+	net_buf_simple_add_u8(&otc_tx_buf, 0);
+
+	/* */
+
+	inst->otc_inst->write_params.offset = 0;
+	inst->otc_inst->write_params.data = otc_tx_buf.data;
+	inst->otc_inst->write_params.length = otc_tx_buf.len;
+	inst->otc_inst->write_params.handle = inst->otc_inst->oacp_handle;
+	inst->otc_inst->write_params.func = write_oacp_cp_write_req_cb;
+
+	err = bt_gatt_write(conn, &inst->otc_inst->write_params);
+
+	if (!err) {
+		inst->busy = true;
+	}
+
+	cur_inst = inst;
+	inst->rcvd_size = 0;
+
+	return err;
+}
 int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 				   struct bt_conn *conn)
 {
@@ -1183,6 +1279,35 @@ int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 	}
 
 	return oacp_read(conn, inst);
+}
+
+int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst,
+				   struct bt_conn *conn, uint8_t *buf,size_t len,
+			   off_t offset)
+{
+	struct bt_otc_internal_instance_t *inst;
+
+	if (!conn) {
+		BT_WARN("Invalid Connection");
+		return -ENOTCONN;
+	} else if (!otc_inst) {
+		BT_ERR("Invalid OTC instance");
+		return -EINVAL;
+	}
+
+	inst = lookup_inst_by_handle(otc_inst->start_handle);
+
+	if (!inst) {
+		BT_ERR("Invalid OTC instance");
+		return -EINVAL;
+	}
+	/* No need check size */
+	if (len == 0) {
+		BT_WARN("Unknown object size");
+		return -EINVAL;
+	}
+
+	return oacp_write(conn, inst, buf, len, offset);
 }
 
 static void read_next_metadata(struct bt_conn *conn,
