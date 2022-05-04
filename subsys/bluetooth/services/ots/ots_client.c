@@ -1188,7 +1188,6 @@ static int oacp_write(struct bt_conn *conn,
 			 uint8_t *buf, size_t len, off_t offset)
 {
 	int err;
-	struct bt_gatt_ots_l2cap *l2cap;
 
 	LOG_DBG("");
 	if (!inst->otc_inst->oacp_handle) {

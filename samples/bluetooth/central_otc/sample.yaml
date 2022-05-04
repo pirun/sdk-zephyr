@@ -1,0 +1,7 @@
+sample:
+  name: Bluetooth Central Object transfer client
+tests:
+  sample.bluetooth.central_otc:
+    harness: bluetooth
+    platform_allow: qemu_cortex_m3 qemu_x86 nrf21540dk_nrf52840
+    tags: bluetooth
