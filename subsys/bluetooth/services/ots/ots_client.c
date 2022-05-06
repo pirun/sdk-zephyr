@@ -122,7 +122,7 @@ static int oacp_read(struct bt_conn *conn,
 		     struct bt_otc_internal_instance_t *inst);
 static int oacp_write(struct bt_conn *conn,
 		     struct bt_otc_internal_instance_t *inst,
-			 uint8_t *buf, size_t len, off_t offset);
+			 uint8_t *buf, size_t len, off_t offset, uint8_t mode);
 static void read_next_metadata(struct bt_conn *conn,
 			       struct bt_otc_internal_instance_t *inst);
 static int read_attr(struct bt_conn *conn,
@@ -133,12 +133,20 @@ static int read_attr(struct bt_conn *conn,
 static void tx_done(struct bt_gatt_ots_l2cap *l2cap_ctx,
 		    struct bt_conn *conn)
 {
-	int err;
 	/* Not doing any writes yet */
 	BT_ERR("Unexpected call, context: %p, conn: %p", l2cap_ctx, (void *)conn);
+}
+static void write_obj_tx_done(struct bt_gatt_ots_l2cap *l2cap_ctx,
+		    struct bt_conn *conn)
+{
+	int err;
+	BT_DBG("tx_done call, context: %p, conn: %p", l2cap_ctx, (void *)conn);
 	err = bt_gatt_ots_l2cap_disconnect(l2cap_ctx);
 	if (err < 0) {
 		BT_WARN("Disconnecting L2CAP returned error %d", err);
+	}
+	if(cur_inst->otc_inst->cb->obj_data_written) {
+		cur_inst->otc_inst->cb->obj_data_written(0, conn, cur_inst->l2cap_ctx.tx.len);
 	}
 	cur_inst = NULL;
 }
@@ -1185,7 +1193,7 @@ static int oacp_read(struct bt_conn *conn,
 }
 static int oacp_write(struct bt_conn *conn,
 		     struct bt_otc_internal_instance_t *inst,
-			 uint8_t *buf, size_t len, off_t offset)
+			 uint8_t *buf, size_t len, off_t offset, uint8_t mode)
 {
 	int err;
 
@@ -1214,7 +1222,7 @@ static int oacp_write(struct bt_conn *conn,
 	// l2cap->closed  = chan_closed;
 	// l2cap->tx.data = buf;
 	// l2cap->tx.len = len;
-	inst->l2cap_ctx.tx_done = tx_done;
+	inst->l2cap_ctx.tx_done = write_obj_tx_done;
 	inst->l2cap_ctx.rx_done = rx_done;
 	inst->l2cap_ctx.closed  = chan_closed;
 	inst->l2cap_ctx.tx.data = buf;
@@ -1282,7 +1290,7 @@ int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 
 int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst,
 				   struct bt_conn *conn, uint8_t *buf,size_t len,
-			   off_t offset)
+			   off_t offset, uint8_t mode)
 {
 	struct bt_otc_internal_instance_t *inst;
 
@@ -1306,7 +1314,7 @@ int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst,
 		return -EINVAL;
 	}
 
-	return oacp_write(conn, inst, buf, len, offset);
+	return oacp_write(conn, inst, buf, len, offset, mode);
 }
 
 static void read_next_metadata(struct bt_conn *conn,

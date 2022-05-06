@@ -270,7 +270,7 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 			bwData[idx]= 255 - (idx % 256);
 		}
 		LOG_HEXDUMP_DBG(bwData, OBJ_MAX_SIZE, "button_handler");
-		err = bt_ots_client_write_object_data(&otc, default_conn, bwData, OBJ_MAX_SIZE, 0);
+		err = bt_ots_client_write_object_data(&otc, default_conn, bwData, OBJ_MAX_SIZE, 0,1);
 		if (err) {
 			LOG_ERR("Failed to write object\n");
 			return;
