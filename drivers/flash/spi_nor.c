@@ -735,7 +735,7 @@ static int spi_nor_sfdp_read(const struct device *dev, off_t addr,
 
 #endif /* CONFIG_FLASH_JESD216_API */
 
-static int spi_nor_read_jedec_id(const struct device *dev,
+int spi_nor_read_jedec_id(const struct device *dev,
 				 uint8_t *id)
 {
 	if (id == NULL) {
@@ -1050,7 +1050,8 @@ static int spi_nor_configure(const struct device *dev)
 		LOG_ERR("Device id %02x %02x %02x does not match config %02x %02x %02x",
 			jedec_id[0], jedec_id[1], jedec_id[2],
 			cfg->jedec_id[0], cfg->jedec_id[1], cfg->jedec_id[2]);
-		return -EINVAL;
+		/* ignore jedec_id fail return -EINVAL; */
+		;
 	}
 #endif
 
@@ -1108,6 +1109,7 @@ static int spi_nor_configure(const struct device *dev)
 	}
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+
 
 	if (IS_ENABLED(CONFIG_SPI_NOR_IDLE_IN_DPD)
 	    && (enter_dpd(dev) != 0)) {

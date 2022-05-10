@@ -227,6 +227,23 @@ static int cmd_test(const struct shell *shell, size_t argc, char *argv[])
 
 	return result;
 }
+static int cmd_read_id(const struct shell *shell, size_t argc, char *argv[])
+{
+
+	int result;
+	uint32_t size;
+	const struct device *flash_dev;
+	uint8_t jedec_id[3];
+
+	result = parse_helper(shell, &argc, &argv, &flash_dev, &size);
+	if (result) {
+		return result;
+	}
+	result = spi_nor_read_jedec_id(flash_dev, jedec_id);
+
+
+	return result;
+}
 
 static void device_name_get(size_t idx, struct shell_static_entry *entry);
 
@@ -255,6 +272,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(flash_cmds,
 	SHELL_CMD_ARG(write, &dsub_device_name,
 		"[<device>] <address> <dword> [<dword>...]",
 		cmd_write, 3, BUF_ARRAY_CNT),
+	SHELL_CMD_ARG(id, &dsub_device_name,
+		"read jedec id [<device>]",
+		cmd_read_id, 2, 2),
 	SHELL_SUBCMD_SET_END
 );
 
