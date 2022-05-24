@@ -1196,6 +1196,7 @@ static int oacp_write(struct bt_conn *conn,
 			 uint8_t *buf, size_t len, off_t offset, uint8_t mode)
 {
 	int err;
+	struct bt_gatt_ots_l2cap *l2cap;
 
 	LOG_DBG("");
 	if (!inst->otc_inst->oacp_handle) {
@@ -1211,22 +1212,16 @@ static int oacp_write(struct bt_conn *conn,
 	 * transfer?
 	 */
 
-	//err = bt_gatt_ots_l2cap_connect(conn, &l2cap);
-	err = bt_gatt_ots_l2cap_connect(conn, &inst->l2cap_ctx);
+	err = bt_gatt_ots_l2cap_connect(conn, &l2cap);
 	if (err) {
 		BT_DBG("Could not connect l2cap: %d", err);
 		return err;
 	}
-	// l2cap->tx_done = tx_done;
-	// l2cap->rx_done = rx_done;
-	// l2cap->closed  = chan_closed;
-	// l2cap->tx.data = buf;
-	// l2cap->tx.len = len;
-	inst->l2cap_ctx.tx_done = write_obj_tx_done;
-	inst->l2cap_ctx.rx_done = rx_done;
-	inst->l2cap_ctx.closed  = chan_closed;
-	inst->l2cap_ctx.tx.data = buf;
-	inst->l2cap_ctx.tx.len = len;
+	l2cap->tx_done = write_obj_tx_done;
+	l2cap->rx_done = rx_done;
+	l2cap->closed  = chan_closed;
+	l2cap->tx.data = buf;
+	l2cap->tx.len = len;
 
 	net_buf_simple_reset(&otc_tx_buf);
 

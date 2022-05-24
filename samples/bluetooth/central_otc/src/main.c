@@ -21,17 +21,10 @@
 
 #include <sys/byteorder.h>
 #include <bluetooth/scan.h>
-#include <logging/log.h>
 #include <dk_buttons_and_leds.h>
 #include <bluetooth/services/ots.h>
 
-LOG_MODULE_REGISTER(central_ots, 3);
-#define BT_UUID_ESL_VAL (0x8FB8)
-#define BT_UUID_ESL_SERVICE		BT_UUID_DECLARE_16(BT_UUID_ESL_VAL)
-/** Original idea it to use this sample to test ESL service */
-/** Change this value to BT_UUID_OTS for scanning peripheral_ots */
-#define BT_UUID_SERVICE_TO_SCAN BT_UUID_ESL_SERVICE
-/* #define BT_UUID_SERVICE_TO_SCAN BT_UUID_OTS*/
+#define BT_UUID_SERVICE_TO_SCAN BT_UUID_OTS
 #define BT_OTS_NAME_MAX_SIZE 127
 #define FIRST_HANDLE			0x0001
 #define LAST_HANDLE			0xFFFF
@@ -57,10 +50,19 @@ NET_BUF_SIMPLE_DEFINE_STATIC(otc_obj_buf, CONFIG_BT_BUF_ACL_RX_SIZE*4);
 static int16_t otc_handles_assign(struct bt_gatt_dm *dm);
 static void start_scan(void);
 static struct bt_conn *default_conn;
+static void print_hex_number(uint8_t *num, size_t len)
+{
+	printk("0x");
+	for (int i = 0; i < len; i++) {
+		printk("%02x ", num[i]);
+	}
+	printk("\n");
+}
+
 static void discovery_complete(struct bt_gatt_dm *dm,
 			       void *context)
 {
-	LOG_INF("Service discovery completed");
+	printk("Service discovery completed\n");
 	bt_gatt_dm_data_print(dm);
 	/* see if dst has already in our stored tag */
 	otc_handles_assign(dm);
@@ -70,14 +72,14 @@ static void discovery_complete(struct bt_gatt_dm *dm,
 static void discovery_service_not_found(struct bt_conn *conn,
 					void *context)
 {
-	LOG_INF("ESL Service not found");
+	printk("OTS Service not found\n");
 }
 
 static void discovery_error(struct bt_conn *conn,
 			    int err,
 			    void *context)
 {
-	LOG_WRN("Error while discovering ESL service GATT database: (%d)", err);
+	printk("Error while discovering OTS service GATT database: (%d)\n", err);
 }
 struct bt_gatt_dm_cb discovery_cb = {
 	.completed         = discovery_complete,
@@ -97,8 +99,8 @@ static void gatt_discover(struct bt_conn *conn)
 			       &discovery_cb,
 			       NULL);
 	if (err) {
-		LOG_ERR("could not start the discovery procedure, error "
-			"code: %d", err);
+		printk("could not start the discovery procedure, error "
+			"code: %d\n", err);
 	}
 }
 static void start_scan(void)
@@ -106,7 +108,7 @@ static void start_scan(void)
 	int err;
 	err = bt_scan_start(BT_SCAN_TYPE_SCAN_ACTIVE);
 	if (err) {
-		LOG_ERR("Scanning ESL TAG failed to start (err %d)",
+		printk("Scanning OTS TAG failed to start (err %d)\n",
 			err);
 	}
 	
@@ -168,7 +170,7 @@ static void scan_filter_no_match(struct bt_scan_device_info *device_info,
 
 	if (device_info->recv_info->adv_type == BT_GAP_ADV_TYPE_ADV_DIRECT_IND) {
 		bt_addr_le_to_str(device_info->recv_info->addr, addr, sizeof(addr));
-		LOG_DBG("Direct advertising received from %s\n", addr);
+		printk("Direct advertising received from %s\n", addr);
 
 		err = bt_conn_le_create(device_info->recv_info->addr,
 					BT_CONN_LE_CREATE_CONN,
@@ -186,16 +188,16 @@ static void scan_filter_match(struct bt_scan_device_info *device_info,
 {
 	char addr[BT_ADDR_LE_STR_LEN];
 	bt_addr_le_to_str(device_info->recv_info->addr, addr, sizeof(addr));
-	LOG_DBG("filters %d, %d, %d, %d, %d, %d", 
+	printk("filters %d, %d, %d, %d, %d, %d\n", 
 		filter_match->name.match, filter_match->addr.match, filter_match->uuid.match,
 		filter_match->appearance.match, filter_match->short_name.match, filter_match->manufacturer_data.match);
-	LOG_INF("Filters matched. Address: %s connectable: %d",
-		log_strdup(addr), connectable);
+	printk("Filters matched. Address: %s connectable: %d\n",
+		addr, connectable);
 }
 
 static void scan_connecting_error(struct bt_scan_device_info *device_info)
 {
-	LOG_WRN("scan Connecting failed");
+	printk("scan Connecting failed\n");
 }
 
 static void scan_connecting(struct bt_scan_device_info *device_info,
@@ -205,7 +207,7 @@ static void scan_connecting(struct bt_scan_device_info *device_info,
 
 	bt_addr_le_to_str(device_info->recv_info->addr, addr, sizeof(addr));
 
-	LOG_DBG("found %s", log_strdup(addr));
+	printk("found %s\n", addr);
 	default_conn = bt_conn_ref(conn);
 }
 BT_SCAN_CB_INIT(scan_cb, scan_filter_match, scan_filter_no_match,
@@ -223,26 +225,27 @@ static int scan_init(void)
 
 	err = bt_scan_filter_add(BT_SCAN_FILTER_TYPE_UUID, BT_UUID_SERVICE_TO_SCAN);
 	if (err) {
-		LOG_ERR("Scanning filters cannot be set (err %d)", err);
+		printk("Scanning filters cannot be set (err %d)\n", err);
 		return err;
 	}
 
 	err = bt_scan_filter_enable(mode, false);
 	if (err) {
-		LOG_ERR("Filters cannot be turned on (err %d)", err);
+		printk("Filters cannot be turned on (err %d)\n", err);
 		return err;
 	}
 
-	LOG_INF("Scan module initialized");
+	printk("Scan module initialized\n");
 	return err;
 }
 
 static void button_handler(uint32_t button_state, uint32_t has_changed)
 {
 	uint32_t button = button_state & has_changed;
+	uint32_t size_to_write;
 	int err;
     if (button & DK_BTN1_MSK){
-        LOG_DBG("select OTS object");
+        printk("select OTS object\n");
 		if(!first_selected) {
 			err = bt_ots_client_select_first(&otc, default_conn);
 			first_selected = true;
@@ -250,37 +253,37 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 			err = bt_ots_client_select_next(&otc, default_conn);
 		}
 		if (err) {
-			LOG_ERR("Failed to select object\n");
+			printk("Failed to select object\n");
 			return;
 		}
-		LOG_INF("Selecting object succeeded\n");
+		printk("Selecting object succeeded\n");
     }
     if (button & DK_BTN2_MSK){
-        LOG_DBG("read OTS object meta");
+        printk("read OTS object meta\n");
 		err = bt_ots_client_read_object_metadata(&otc, default_conn,
 						 BT_OTS_METADATA_REQ_ALL);
 		if (err) {
-			LOG_ERR("Failed to read object metadata\n");
+			printk("Failed to read object metadata\n");
 			return;
 		}
     }
     if (button & DK_BTN3_MSK) {
-        LOG_DBG("write OTS object len %d", OBJ_MAX_SIZE);
+		size_to_write = otc.cur_object.size.alloc-otc.cur_object.size.cur;
+        printk("write OTS object len %d\n", size_to_write);
 		for(uint32_t idx=0;idx<OBJ_MAX_SIZE;idx++) {
 			bwData[idx]= 255 - (idx % 256);
 		}
-		LOG_HEXDUMP_DBG(bwData, OBJ_MAX_SIZE, "button_handler");
-		err = bt_ots_client_write_object_data(&otc, default_conn, bwData, OBJ_MAX_SIZE, 0,1);
+		err = bt_ots_client_write_object_data(&otc, default_conn, bwData, size_to_write, 0,1);
 		if (err) {
-			LOG_ERR("Failed to write object\n");
+			printk("Failed to write object\n");
 			return;
 		}		
     }
     if (button & DK_BTN4_MSK){
-        LOG_DBG("read OTS object");
+        printk("read OTS object\n");
 		err = bt_ots_client_read_object_data(&otc, default_conn);
 		if (err) {
-			LOG_ERR("Failed to read object\n");
+			printk("Failed to read object %d\n", err);
 			return;
 		}
     }
@@ -289,11 +292,11 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 void on_obj_selected(struct bt_ots_client *ots_inst,
 			     struct bt_conn *conn, int err) 
 {
-	LOG_DBG("Current object selected");
+	printk("Current object selected\n");
 	/* TODO: Read metadata here? */
 	/* For now: Left to the application */
 	if(err == BT_GATT_OTS_OLCP_RES_OUT_OF_BONDS) {
-		LOG_ERR("BT_GATT_OTS_OLCP_RES_OUT_OF_BONDS %d", err);
+		printk("BT_GATT_OTS_OLCP_RES_OUT_OF_BONDS %d\n", err);
 		bt_ots_client_select_first(&otc, default_conn);
 	}
 	/* Only one object at a time is selected in OTS */
@@ -311,13 +314,13 @@ int on_obj_data_read(struct bt_ots_client *ots_inst,
 {
 	int cb_err = 0;
 
-	LOG_DBG("Received OTS Object content, %i bytes at offset %i",
+	printk("Received OTS Object content, %i bytes at offset %i\n",
 		len, offset);
 
-	LOG_HEXDUMP_DBG(data_p, len, "content");
+	print_hex_number(data_p, len);
 
 	if (len > net_buf_simple_tailroom(&otc_obj_buf)) {
-		LOG_WRN("Can not fit whole object");
+		printk("Can not fit whole object\n");
 		cb_err = -EMSGSIZE;
 	}
 
@@ -325,7 +328,7 @@ int on_obj_data_read(struct bt_ots_client *ots_inst,
 			       MIN(net_buf_simple_tailroom(&otc_obj_buf), len));
 
 	if (is_complete) {
-		LOG_DBG(" object received");
+		printk(" object received\n");
 
 		/* Reset buf in case the same object is read again without */
 		/* calling select in between */
@@ -339,12 +342,12 @@ void on_obj_metadata_read(struct bt_ots_client *ots_inst,
 					struct bt_conn *conn, int err,
 					uint8_t metadata_read)
 {
-	LOG_INF("Object's meta data:");
-	LOG_INF("\tCurrent size\t:%u", ots_inst->cur_object.size.cur);
-	LOG_INF("\tAlloc size\t:%u", ots_inst->cur_object.size.alloc);
+	printk("Object's meta data:\n");
+	printk("\tCurrent size\t:%u", ots_inst->cur_object.size.cur);
+	printk("\tAlloc size\t:%u", ots_inst->cur_object.size.alloc);
 
 	if (ots_inst->cur_object.size.cur > otc_obj_buf.size) {
-		LOG_DBG("Object larger than allocated buffer");
+		printk("Object larger than allocated buffer\n");
 	}
 
 	bt_ots_metadata_display(&ots_inst->cur_object, 1);
@@ -362,101 +365,101 @@ static int16_t otc_handles_assign(struct bt_gatt_dm *dm)
 	struct bt_gatt_subscribe_params *sub_params_2 = NULL;
 
 	if (bt_uuid_cmp(gatt_service->uuid, BT_UUID_OTS)) {
-		LOG_ERR("ESL SERVICE UUID not match\n");
+		printk("OTS SERVICE UUID not match\n");
 		return -ENOTSUP;
 	}
 	gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_FEATURE);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_FEATURE characteristic.");
+		printk("Missing BT_UUID_OTS_FEATURE characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_FEATURE);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_FEATURE value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_FEATURE value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.feature_handle = gatt_desc->handle;
     
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_NAME);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_NAME characteristic.");
+		printk("Missing BT_UUID_OTS_NAME characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_NAME);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_NAME value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_NAME value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.obj_name_handle = gatt_desc->handle;
     
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_TYPE);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_TYPE characteristic.");
+		printk("Missing BT_UUID_OTS_TYPE characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_TYPE);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_TYPE value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_TYPE value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.obj_type_handle = gatt_desc->handle;    
 
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_SIZE);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_SIZE characteristic.");
+		printk("Missing BT_UUID_OTS_SIZE characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_SIZE);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_SIZE value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_SIZE value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.obj_size_handle = gatt_desc->handle;
 
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_ID);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_ID characteristic.");
+		printk("Missing BT_UUID_OTS_ID characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_ID);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_ID value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_ID value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.obj_id_handle = gatt_desc->handle;
     
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_PROPERTIES);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_PROPERTIES characteristic.");
+		printk("Missing BT_UUID_OTS_PROPERTIES characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_PROPERTIES);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_PROPERTIES value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_PROPERTIES value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.obj_properties_handle = gatt_desc->handle;
     
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_ACTION_CP);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_ACTION_CP characteristic.");
+		printk("Missing BT_UUID_OTS_ACTION_CP characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_ACTION_CP);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_ACTION_CP value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_ACTION_CP value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.oacp_handle = gatt_desc->handle;
     
     gatt_chrc = bt_gatt_dm_char_by_uuid(dm, BT_UUID_OTS_LIST_CP);
 	if (!gatt_chrc) {
-		LOG_ERR("Missing BT_UUID_OTS_LIST_CP characteristic.");
+		printk("Missing BT_UUID_OTS_LIST_CP characteristic.\n");
 		return -EINVAL;
 	}
 	gatt_desc = bt_gatt_dm_desc_by_uuid(dm, gatt_chrc, BT_UUID_OTS_LIST_CP);
 	if (!gatt_desc) {
-		LOG_ERR("Missing BT_UUID_OTS_LIST_CP value descriptor in characteristic.");
+		printk("Missing BT_UUID_OTS_LIST_CP value descriptor in characteristic.\n");
 		return -EINVAL;
 	}
 	otc.olcp_handle = gatt_desc->handle;
@@ -485,7 +488,7 @@ static int16_t otc_handles_assign(struct bt_gatt_dm *dm)
 	}
 	/* No more attributes found */
 	bt_ots_client_register(&otc);
-	LOG_DBG("Setup complete for OTS");
+	printk("Setup complete for OTS\n");
 	return 0;
 }
 
@@ -496,9 +499,9 @@ void bt_otc_init(void)
 	otc_cb.obj_metadata_read = on_obj_metadata_read;
 	otc.start_handle = FIRST_HANDLE;
 	otc.end_handle = LAST_HANDLE;
-	LOG_DBG("Current object selected callback: %p", otc_cb.obj_selected);
-	LOG_DBG("Content callback: %p", otc_cb.obj_data_read);
-	LOG_DBG("Metadata callback: %p", otc_cb.obj_metadata_read);
+	printk("Current object selected callback: %p\n", otc_cb.obj_selected);
+	printk("Content callback: %p\n", otc_cb.obj_data_read);
+	printk("Metadata callback: %p\n", otc_cb.obj_metadata_read);
 	otc.cb = &otc_cb;
 }
 void main(void)
@@ -513,7 +516,7 @@ void main(void)
 	}
     scan_init();
     bt_otc_init();
-	printk("Bluetooth initialized\n");
+	printk("Bluetooth OTS client sample running\n");
 
 	start_scan();
 }
