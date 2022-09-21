@@ -79,6 +79,7 @@ struct bt_gatt_ots_oacp_proc {
 		struct bt_gatt_ots_oacp_cs_calc_params {
 			uint32_t offset;
 			uint32_t len;
+			uint32_t crc_resp;
 		} cs_calc_params;
 		struct bt_gatt_ots_oacp_read_params {
 			uint32_t offset;
