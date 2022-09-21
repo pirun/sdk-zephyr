@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/check.h>
 #include <zephyr/kernel.h>
 
 #include <zephyr/bluetooth/gatt.h>
@@ -23,7 +24,7 @@
 LOG_MODULE_DECLARE(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 
 #define OACP_PROC_TYPE_SIZE	1
-#define OACP_RES_MAX_SIZE	3
+#define OACP_RES_MAX_SIZE	7
 
 #if defined(CONFIG_BT_OTS_OACP_WRITE_SUPPORT)
 static ssize_t oacp_write_proc_cb(struct bt_gatt_ots_l2cap *l2cap_ctx,
@@ -161,6 +162,49 @@ exit:
 }
 #endif
 
+#if defined(CONFIG_BT_OTS_OACP_CHECKSUM_SUPPORT)
+static enum bt_gatt_ots_oacp_res_code oacp_checksum_proc_validate(
+	struct bt_conn *conn,
+	struct bt_ots *ots,
+	struct bt_gatt_ots_oacp_proc *proc)
+{
+	struct bt_gatt_ots_oacp_cs_calc_params *params = &proc->cs_calc_params;
+
+	LOG_DBG("Validating Checksum procedure with offset: 0x%08X and "
+		"length: 0x%08X", params->offset, params->len);
+
+	CHECKIF(!ots->cur_obj) {
+		return BT_GATT_OTS_OACP_RES_INV_OBJ;
+	}
+
+	CHECKIF(params->offset > ots->cur_obj->metadata.size.cur) {
+		return BT_GATT_OTS_OACP_RES_INV_PARAM;
+	}
+
+	CHECKIF((params->offset + (uint64_t) params->len) > ots->cur_obj->metadata.size.alloc) {
+		return BT_GATT_OTS_OACP_RES_INV_PARAM;
+	}
+
+	CHECKIF(ots->cur_obj->state.type != BT_GATT_OTS_OBJECT_IDLE_STATE) {
+		return BT_GATT_OTS_OACP_RES_OBJ_LOCKED;
+	}
+	/* TODO:An object transfer is in progress that is using the Current Object.*/
+	/** CHECKIF(transfer is in progress) {
+	 *	return BT_GATT_OTS_OACP_RES_OBJ_LOCKED;
+	 * }
+	 */
+
+	if (ots->cb->obj_cal_checksum) {
+		params->crc_resp = ots->cb->obj_cal_checksum(ots->cur_obj->id,
+				   params->offset, params->len);
+		LOG_DBG("Checksum procedure is accepted");
+		return BT_GATT_OTS_OACP_RES_SUCCESS;
+	} else {
+		return BT_GATT_OTS_OACP_RES_OPER_FAILED;
+	}
+}
+#endif
+
 static enum bt_gatt_ots_oacp_res_code oacp_read_proc_validate(
 	struct bt_conn *conn,
 	struct bt_ots *ots,
@@ -290,7 +334,10 @@ static enum bt_gatt_ots_oacp_res_code oacp_proc_validate(
 	case BT_GATT_OTS_OACP_PROC_DELETE:
 		return oacp_delete_proc_validate(conn, ots, proc);
 #endif
+#if defined(CONFIG_BT_OTS_OACP_CHECKSUM_SUPPORT)
 	case BT_GATT_OTS_OACP_PROC_CHECKSUM_CALC:
+		return oacp_checksum_proc_validate(conn, ots, proc);
+#endif
 	case BT_GATT_OTS_OACP_PROC_EXECUTE:
 	case BT_GATT_OTS_OACP_PROC_ABORT:
 	default:
@@ -581,7 +628,7 @@ static void oacp_ind_cb(struct bt_conn *conn,
 }
 
 static int oacp_ind_send(const struct bt_gatt_attr *oacp_attr,
-			 enum bt_gatt_ots_oacp_proc_type req_op_code,
+			 struct bt_gatt_ots_oacp_proc oacp_proc,
 			 enum bt_gatt_ots_oacp_res_code oacp_status)
 {
 	uint8_t oacp_res[OACP_RES_MAX_SIZE];
@@ -590,8 +637,13 @@ static int oacp_ind_send(const struct bt_gatt_attr *oacp_attr,
 
 	/* Encode OACP Response */
 	oacp_res[oacp_res_len++] = BT_GATT_OTS_OACP_PROC_RESP;
-	oacp_res[oacp_res_len++] = req_op_code;
+	oacp_res[oacp_res_len++] = oacp_proc.type;
 	oacp_res[oacp_res_len++] = oacp_status;
+
+	if (oacp_proc.type == BT_GATT_OTS_OACP_PROC_CHECKSUM_CALC) {
+		sys_put_le32(oacp_proc.cs_calc_params.crc_resp, (oacp_res + oacp_res_len));
+		oacp_res_len += sizeof(uint32_t);
+	}
 
 	/* Prepare indication parameters */
 	memset(&ots->oacp_ind.params, 0, sizeof(ots->oacp_ind.params));
@@ -652,7 +704,7 @@ ssize_t bt_gatt_ots_oacp_write(struct bt_conn *conn,
 		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
 	}
 
-	oacp_ind_send(attr, oacp_proc.type, oacp_status);
+	oacp_ind_send(attr, oacp_proc, oacp_status);
 	return len;
 }
 

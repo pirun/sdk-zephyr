@@ -125,6 +125,8 @@ static int oacp_read(struct bt_conn *conn,
 static int oacp_write(struct bt_conn *conn, struct bt_otc_internal_instance_t *inst,
 		      const void *buf, uint32_t len, uint32_t offset,
 		      enum bt_ots_oacp_write_op_mode mode);
+static int oacp_checksum(struct bt_conn *conn, struct bt_otc_internal_instance_t *inst,
+			 uint32_t offset, uint32_t len);
 static void read_next_metadata(struct bt_conn *conn,
 			       struct bt_otc_internal_instance_t *inst);
 static int read_attr(struct bt_conn *conn,
@@ -372,6 +374,15 @@ static void oacp_ind_handler(struct bt_conn *conn,
 			net_buf_simple_pull_u8(&net_buf);
 		enum bt_gatt_ots_oacp_res_code  result_code =
 			net_buf_simple_pull_u8(&net_buf);
+		if (req_opcode == BT_GATT_OTS_OACP_PROC_CHECKSUM_CALC) {
+			uint32_t crc = net_buf_simple_pull_le32(&net_buf);
+
+			BT_DBG("Object checksum 0x%08x\n", crc);
+			if (otc_inst->cb->obj_checksum_got) {
+				otc_inst->cb->obj_checksum_got(otc_inst, conn, result_code, crc);
+			}
+		}
+
 		print_oacp_response(req_opcode, result_code);
 	} else {
 		BT_DBG("Invalid indication opcode %u", op_code);
@@ -1155,6 +1166,8 @@ static void write_oacp_cp_write_req_cb(struct bt_conn *conn, uint8_t err,
 	inst->busy = false;
 }
 
+
+
 static int oacp_read(struct bt_conn *conn,
 		     struct bt_otc_internal_instance_t *inst)
 {
@@ -1274,6 +1287,50 @@ static int oacp_write(struct bt_conn *conn, struct bt_otc_internal_instance_t *i
 
 	return err;
 }
+
+static int oacp_checksum(struct bt_conn *conn, struct bt_otc_internal_instance_t *inst,
+			 uint32_t offset, uint32_t len)
+{
+	int err;
+
+	BT_DBG("oacp_checksum");
+
+	if (!inst->otc_inst->oacp_handle) {
+		BT_DBG("Handle not set");
+		return -EINVAL;
+	} else if (inst->busy) {
+		return -EBUSY;
+	} else if (cur_inst) {
+		return -EBUSY;
+	}
+
+	net_buf_simple_reset(&otc_tx_buf);
+
+	/* OP Code */
+	net_buf_simple_add_u8(&otc_tx_buf, BT_GATT_OTS_OACP_PROC_CHECKSUM_CALC);
+
+	/* Offset */
+	net_buf_simple_add_le32(&otc_tx_buf, offset);
+
+	/* Len */
+	net_buf_simple_add_le32(&otc_tx_buf, len);
+
+	inst->otc_inst->write_params.offset = 0;
+	inst->otc_inst->write_params.data = otc_tx_buf.data;
+	inst->otc_inst->write_params.length = otc_tx_buf.len;
+	inst->otc_inst->write_params.handle = inst->otc_inst->oacp_handle;
+	inst->otc_inst->write_params.func = write_oacp_cp_cb;
+
+	err = bt_gatt_write(conn, &inst->otc_inst->write_params);
+
+	if (err != 0) {
+		inst->busy = true;
+		cur_inst = inst;
+	}
+
+	return err;
+}
+
 int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 				   struct bt_conn *conn)
 {
@@ -1368,6 +1425,55 @@ int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst,
 	}
 
 	return oacp_write(conn, inst, buf, (uint32_t)len, (uint32_t)offset, mode);
+}
+
+int bt_ots_client_get_object_checksum(struct bt_ots_client *otc_inst, struct bt_conn *conn,
+				      off_t offset, size_t len)
+{
+	struct bt_otc_internal_instance_t *inst;
+
+	CHECKIF(!conn) {
+		BT_WARN("Invalid Connection");
+		return -ENOTCONN;
+	}
+
+	CHECKIF(!otc_inst) {
+		BT_ERR("Invalid OTC instance");
+		return -EINVAL;
+	}
+
+	/* OTS_v10.pdf Table 3.9: Object Action Control Point Procedure Requirements
+	 *	Offset and Length field are UINT32 Length
+	 */
+	CHECKIF(len > UINT32_MAX) {
+		BT_ERR("length exceeds UINT32");
+		return -EINVAL;
+	}
+
+	CHECKIF(len == 0) {
+		BT_ERR("length equals zero");
+		return -EINVAL;
+	}
+
+	CHECKIF((offset > UINT32_MAX) || (offset < 0)) {
+		BT_ERR("offset exceeds UINT32");
+		return -EINVAL;
+	}
+
+	CHECKIF((len + offset) > otc_inst->cur_object.size.cur) {
+		BT_ERR("The sum of Offset and Length exceed the Current Size %lu alloc %zu.",
+		(len + offset),	otc_inst->cur_object.size.cur);
+		return -EINVAL;
+	}
+
+	inst = lookup_inst_by_handle(otc_inst->start_handle);
+
+	if (!inst) {
+		BT_ERR("Invalid OTC instance");
+		return -EINVAL;
+	}
+
+	return oacp_checksum(conn, inst, (uint32_t)offset, (uint32_t)len);
 }
 
 static void read_next_metadata(struct bt_conn *conn,

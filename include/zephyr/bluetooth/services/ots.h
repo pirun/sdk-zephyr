@@ -725,6 +725,19 @@ struct bt_ots_cb {
 	 */
 	void (*obj_name_written)(struct bt_ots *ots, struct bt_conn *conn,
 				 uint64_t id, const char *cur_name, const char *new_name);
+
+	/** @brief Object Calculate checksum callback
+	 *
+	 *  This callback is called when the OACP Calculate Checksum procedure is performed.
+	 *  Because object data is opaque to OTS service, the OTS user can only know where
+	 *  data is.
+	 *
+	 *  @param id         Object ID.
+	 *  @param offset     The first octet of the object contents need to be calculated.
+	 *  @param length     The length number of octets object name.
+	 */
+	uint32_t (*obj_cal_checksum)(uint64_t id, off_t offset, size_t len);
+
 };
 
 /** @brief Descriptor for OTS initialization. */
@@ -888,6 +901,20 @@ struct bt_ots_client_cb {
 	 */
 	void (*obj_data_written)(struct bt_ots_client *ots_inst,
 				 struct bt_conn *conn, size_t len);
+
+	/** @brief Callback function when checksum indication is received.
+	 *
+	 *  Called when the oacp_ind_handler received response of
+	 *  OP BT_GATT_OTS_OACP_PROC_CHECKSUM_CALC.
+	 *
+	 *  @param ots_inst          Pointer to the OTC instance.
+	 *  @param conn              The connection to the peer device.
+	 *  @param err               Error code (bt_ots_olcp_res_code).
+	 *  @param crc               Checksum code (bt_ots_olcp_res_code).
+	 */
+	void (*obj_checksum_got)(struct bt_ots_client *ots_inst,
+				 struct bt_conn *conn, int err, uint32_t crc);
+
 };
 
 /** @brief Register an Object Transfer Service Instance.
@@ -1011,7 +1038,7 @@ int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 
 /** @brief Write the data of the current selected object.
  *
- *  This will trigger an OACP write operation for the current size of the object
+ *  This will trigger an OACP write operation for the current object
  *  with a specified offset and then expect transferring the content via the L2CAP CoC.
  *
  *  The length of the data written to object is returned in the obj_data_written() callback.
@@ -1028,6 +1055,23 @@ int bt_ots_client_read_object_data(struct bt_ots_client *otc_inst,
 int bt_ots_client_write_object_data(struct bt_ots_client *otc_inst, struct bt_conn *conn,
 				    const void *buf, size_t len, off_t offset,
 				    enum bt_ots_oacp_write_op_mode mode);
+
+/** @brief Get the checksum of the current selected object.
+ *
+ *  This will trigger an OACP calculate checksum operation for the current object
+ *  with a specified offset and length.
+ *
+ *  The checksum goes to OACP IND and obj_data_checksum() callback.
+ *
+ *  @param otc_inst     Pointer to the OTC instance.
+ *  @param conn         Pointer to the connection object.
+ *  @param offset       Offset to calculate, usually 0.
+ *  @param len          Len of data.
+ *
+ *  @return int         0 if success, ERRNO on failure.
+ */
+int bt_ots_client_get_object_checksum(struct bt_ots_client *otc_inst, struct bt_conn *conn,
+				      off_t offset, size_t len);
 
 /** @brief Directory listing object metadata callback
  *
