@@ -7,7 +7,7 @@
  */
 
 #define BT_EATT_PSM		0x27
-#define BT_ATT_DEFAULT_LE_MTU	23
+#define BT_ATT_DEFAULT_LE_MTU	65
 #define BT_ATT_TIMEOUT		K_SECONDS(30)
 
 /* ATT MTU must be equal for RX and TX, so select the smallest value */
