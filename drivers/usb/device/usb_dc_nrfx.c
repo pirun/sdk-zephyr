@@ -23,7 +23,9 @@
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
 #include <nrfx_usbd.h>
 #include <nrfx_power.h>
-
+#include <nrf_profiler.h>
+uint16_t write_complete_id;
+extern void profile_no_data_event(uint16_t evt_id);
 
 #define LOG_LEVEL CONFIG_USB_DRIVER_LOG_LEVEL
 #include <zephyr/logging/log.h>
@@ -835,6 +837,7 @@ static inline void usbd_work_process_ep_events(struct usbd_ep_event *ep_evt)
 		}
 		ep_ctx->cfg.cb(ep_ctx->cfg.addr,
 			       USB_DC_EP_DATA_IN);
+		profile_no_data_event(write_complete_id);
 		break;
 	default:
 		break;
@@ -1917,6 +1920,9 @@ static int usb_init(const struct device *arg)
 	k_thread_name_set(&usbd_work_queue.thread, "usbd_workq");
 	k_work_init(&ctx->usb_work, usbd_work_handler);
 
+	nrf_profiler_init();
+
+	write_complete_id = nrf_profiler_register_event_type("write_complete", NULL, NULL, 0);
 	return 0;
 }
 
