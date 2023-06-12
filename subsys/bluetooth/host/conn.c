@@ -1496,7 +1496,7 @@ void notify_remote_info(struct bt_conn *conn)
 
 	err = bt_conn_get_remote_info(conn, &remote_info);
 	if (err) {
-		LOG_DBG("Notify remote info failed %d", err);
+		LOG_ERR("Notify remote info failed %d", err);
 		return;
 	}
 

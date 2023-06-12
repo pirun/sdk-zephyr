@@ -659,7 +659,7 @@ int bt_le_create_conn_synced(const struct bt_conn *conn, const struct bt_le_ext_
 	bt_addr_le_copy(&cp->peer_addr, &conn->le.dst);
 	cp->filter_policy = BT_HCI_LE_CREATE_CONN_FP_NO_FILTER;
 	cp->own_addr_type = own_addr_type;
-
+	LOG_HEXDUMP_INF(cp, sizeof(*cp), "LE Extended Create Conn V2");
 	/* The Initiating_PHY is the secondary phy of the corresponding ext adv set */
 	if (adv->options & BT_LE_ADV_OPT_CODED) {
 		cp->phys = BT_HCI_LE_EXT_SCAN_PHY_CODED;
@@ -674,7 +674,8 @@ int bt_le_create_conn_synced(const struct bt_conn *conn, const struct bt_le_ext_
 	set_phy_conn_param(conn, phy);
 
 	bt_hci_cmd_state_set_init(buf, &state, bt_dev.flags, BT_DEV_INITIATING, true);
-
+	LOG_INF("subevent %d", subevent);
+	LOG_HEXDUMP_INF(buf->data, buf->len, "bt_le_create_conn_synced");
 	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_EXT_CREATE_CONN_V2, buf, NULL);
 }
 
