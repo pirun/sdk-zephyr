@@ -22,7 +22,10 @@
 #include <zephyr/types.h>
 #include <zephyr/kernel.h>
 
-#define OBJ_MAX_SIZE			      1024
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(central_otc, 3);
+
+#define OBJ_MAX_SIZE			      15000
 /* Hardcoded here since definition is in internal header */
 #define BT_GATT_OTS_OLCP_RES_OPERATION_FAILED 0x04
 #define BT_GATT_OTS_OLCP_RES_OUT_OF_BONDS     0x05
@@ -141,6 +144,7 @@ static void otc_btn_work_fn(struct k_work *work)
 
 			last_checksum = bt_ots_client_calc_checksum(obj_data_buf, size_to_write);
 			printk("Data sent checksum 0x%08x\n", last_checksum);
+			LOG_INF("write start");
 			err = bt_ots_client_write_object_data(&otc, default_conn, obj_data_buf,
 							      size_to_write, 0,
 							      BT_OTS_OACP_WRITE_OP_MODE_NONE);
@@ -154,6 +158,7 @@ static void otc_btn_work_fn(struct k_work *work)
 	} else if (btn_work->pins == BIT(button3.pin)) {
 		if (BT_OTS_OBJ_GET_PROP_READ(otc.cur_object.props)) {
 			printk("read OTS object\n");
+			LOG_INF("read start");
 			err = bt_ots_client_read_object_data(&otc, default_conn);
 			if (err != 0) {
 				printk("Failed to read object %d\n", err);
@@ -253,7 +258,9 @@ static bool eir_found(struct bt_data *data, void *user_data)
 				continue;
 			}
 
-			param = BT_LE_CONN_PARAM_DEFAULT;
+			// param = BT_LE_CONN_PARAM_DEFAULT;
+			param = BT_LE_CONN_PARAM(11, 11, 0, 400);
+
 			err = bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, param, &default_conn);
 			if (err != 0) {
 				printk("Create conn failed (err %d)\n", err);
@@ -573,9 +580,9 @@ static void on_obj_selected(struct bt_ots_client *ots_inst, struct bt_conn *conn
 static int on_obj_data_read(struct bt_ots_client *ots_inst, struct bt_conn *conn, uint32_t offset,
 			    uint32_t len, uint8_t *data_p, bool is_complete)
 {
-	printk("Received OTS Object content, %i bytes at offset %i\n", len, offset);
+	// printk("Received OTS Object content, %i bytes at offset %i\n", len, offset);
 
-	print_hex_number(data_p, len);
+	// print_hex_number(data_p, len);
 
 	if ((offset + len) > OBJ_MAX_SIZE) {
 		printk("Can not fit whole object, drop the rest of data\n");
@@ -585,8 +592,9 @@ static int on_obj_data_read(struct bt_ots_client *ots_inst, struct bt_conn *conn
 
 	if (is_complete) {
 		printk("Object total received %d\n", len + offset);
-		print_hex_number(obj_data_buf, len + offset);
+		// print_hex_number(obj_data_buf, len + offset);
 		(void)memset(obj_data_buf, 0, OBJ_MAX_SIZE);
+		LOG_INF("read end");
 		otc_checksum_work.offset = 0;
 		otc_checksum_work.len = otc.cur_object.size.cur;
 		k_work_schedule(&otc_checksum_work.work, K_NO_WAIT);
@@ -613,6 +621,7 @@ static void on_obj_data_written(struct bt_ots_client *ots_inst, struct bt_conn *
 {
 	int err;
 
+	LOG_INF("write end");
 	printk("Object been written %d\n", len);
 	/* Update object size after write done*/
 	err = bt_ots_client_read_object_metadata(&otc, default_conn,

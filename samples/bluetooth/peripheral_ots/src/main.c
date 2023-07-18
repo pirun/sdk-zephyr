@@ -15,12 +15,14 @@
 #include <zephyr/bluetooth/gatt.h>
 
 #include <zephyr/bluetooth/services/ots.h>
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(peripheral_otc, 3);
 
 #define DEVICE_NAME      CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN  (sizeof(DEVICE_NAME) - 1)
 
 #define OBJ_POOL_SIZE CONFIG_BT_OTS_MAX_OBJ_CNT
-#define OBJ_MAX_SIZE  100
+#define OBJ_MAX_SIZE  15000
 
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -141,7 +143,7 @@ static ssize_t ots_obj_read(struct bt_ots *ots, struct bt_conn *conn,
 	char id_str[BT_OTS_OBJ_ID_STR_LEN];
 	uint32_t obj_index = OTS_OBJ_ID_TO_OBJ_IDX(id);
 
-	bt_ots_obj_id_to_str(id, id_str, sizeof(id_str));
+	// bt_ots_obj_id_to_str(id, id_str, sizeof(id_str));
 
 	if (!data) {
 		printk("Object with %s ID has been successfully read\n",
@@ -150,18 +152,19 @@ static ssize_t ots_obj_read(struct bt_ots *ots, struct bt_conn *conn,
 		return 0;
 	}
 
-	*data = &objects[obj_index].data[offset];
+	// *data = &objects[obj_index].data[offset];
 
 	/* Send even-indexed objects in 20 byte packets
 	 * to demonstrate fragmented transmission.
 	 */
-	if ((obj_index % 2) == 0) {
-		len = (len < 20) ? len : 20;
-	}
-
-	printk("Object with %s ID is being read\n"
-		"Offset = %lu, Length = %zu\n",
-		id_str, (long)offset, len);
+	// if ((obj_index % 2) == 0) {
+	// 	len = (len < 20) ? len : 20;
+	// }
+	printk("r,%d\n", k_uptime_get_32());
+	len = MIN(CONFIG_BT_L2CAP_TX_MTU, (OBJ_MAX_SIZE - offset));
+	// printk("Object with %s ID is being read\n"
+	// 	"Offset = %lu, Length = %zu\n",
+	// 	id_str, (long)offset, len);
 
 	return len;
 }
@@ -175,12 +178,12 @@ static ssize_t ots_obj_write(struct bt_ots *ots, struct bt_conn *conn,
 
 	bt_ots_obj_id_to_str(id, id_str, sizeof(id_str));
 
-	printk("Object with %s ID is being written\n"
-		"Offset = %lu, Length = %zu, Remaining= %zu\n",
-		id_str, (long)offset, len, rem);
+	// printk("Object with %s ID is being written\n"
+	// 	"Offset = %lu, Length = %zu, Remaining= %zu\n",
+	// 	id_str, (long)offset, len, rem);
 
-	(void)memcpy(&objects[obj_index].data[offset], data, len);
-
+	// (void)memcpy(&objects[obj_index].data[offset], data, len);
+	printk("w,%d\n", k_uptime_get_32());
 	return len;
 }
 
