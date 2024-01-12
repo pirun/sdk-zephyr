@@ -10,6 +10,15 @@ config CRYPTO_NRF_ECB
 	# Bluetooth controller uses the ECB peripheral directly
 	# (see subsys/bluetooth/controller/ll_sw/nordic/hal/nrf5/ecb.c),
 	# hence this driver cannot be enabled together with it.
-	depends on !BT_CTLR
+	# Temperary remove dependcy for Gazell and BLE coexistence demo
 	help
 	  Enable nRF HAL-based AES ECB encryption driver
+
+config CRYPTO_NRF_ECB_MULTIUSER
+	bool
+	depends on CRYPTO_NRF_ECB
+	default y if BT_CTLR
+	help
+	  Reassign ECB pointers right before encryption to ensure proper values.
+	  This must be done if the ECB peripheral may be used bypassing this
+	  driver's API (e.g. Bluetooth Controller bypasses the Zephyr driver).
