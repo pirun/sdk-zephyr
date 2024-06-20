@@ -55,8 +55,12 @@ static int do_ecb_encrypt(struct cipher_ctx *ctx, struct cipher_pkt *pkt)
 	uint32_t *key_reverse = (uint32_t *)drv_state.data.key;
 
 	/* AES key order should be reversed on nRF54L */
-	sys_mem_swap(key_reverse, ECB_AES_KEY_SIZE);
-	nrf_ecb_key_set(NRF_ECB00, (uint32_t *)drv_state.data.key);
+	nrf_ecb_key_set(NRF_ECB00, (uint32_t[]){
+		__builtin_bswap32(key_reverse[3]),
+		__builtin_bswap32(key_reverse[2]),
+		__builtin_bswap32(key_reverse[1]),
+		__builtin_bswap32(key_reverse[0]),
+	});
 
 	if (IS_ENABLED(CONFIG_CRYPTO_NRF_ECB_MULTIUSER)) {
 		nrf_ecb_in_ptr_set(NRF_ECB00, &drv_state.data.in_job);
