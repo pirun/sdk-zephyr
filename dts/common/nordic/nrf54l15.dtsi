@@ -609,6 +609,13 @@
 					regulator-initial-mode = <NRF5X_REG_MODE_LDO>;
 				};
 			};
+
+			ecb00: ecb@47000 {
+					compatible = "nordic,nrf-ecb";
+					reg = <0x47000 0x1000>;
+					interrupts = <0x47 0x1>;
+					status = "okay";
+			};
 		};
 
 		rram_controller: rram-controller@5004b000 {
