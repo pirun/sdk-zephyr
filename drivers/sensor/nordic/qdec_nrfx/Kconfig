@@ -14,3 +14,38 @@ config QDEC_NRFX
 	select PINCTRL
 	help
 	  Enable support for nrfx QDEC driver for nRF MCU series.
+
+config QDEC_NRFX_REPORTER
+	int "QDEC reporter"
+	default 0
+	range 0 8
+	help
+	  Specifies the number of samples to be accumulated in the ACC register
+	  before the REPORTRDY and DBLRDY events can be generated.
+	  0 = 10Smpl
+	  1 = 40Smpl
+	  2 = 80Smpl
+	  3 = 120Smpl
+	  4 = 160Smpl
+	  5 = 200Smpl
+	  6 = 240Smpl
+	  7 = 280Smpl
+	  8 = 1Smpl
+
+config QDEC_NRFX_SAMPLEPER
+	int "QDEC samplerer"
+	default 0
+	range 0 10
+	help
+	  Sample period. The SAMPLE register will be updated for every new sample.
+	  0 = 128us
+	  1 = 256us
+	  2 = 512us
+	  3 = 1024us
+	  4 = 2048us
+	  5 = 4096us
+	  6 = 8192us
+	  7 = 16384us
+	  8 = 32768us
+	  9 = 65536us
+	  10 = 131072us

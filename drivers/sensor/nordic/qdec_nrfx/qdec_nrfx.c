@@ -271,8 +271,8 @@ static int qdec_nrfx_init(const struct device *dev)
 	static struct qdec_nrfx_config qdec_##idx##_config = {				     \
 		.qdec = NRFX_QDEC_INSTANCE(idx),					     \
 		.config = {								     \
-			.reportper = NRF_QDEC_REPORTPER_40,				     \
-			.sampleper = NRF_QDEC_SAMPLEPER_2048US,				     \
+			.reportper = CONFIG_QDEC_NRFX_REPORTER,				     \
+			.sampleper = CONFIG_QDEC_NRFX_SAMPLEPER,			     \
 			.skip_gpio_cfg = true,						     \
 			.skip_psel_cfg = true,						     \
 			.ledpre  = QDEC_PROP(idx, led_pre),				     \
