@@ -226,7 +226,7 @@ def load_v2_boards(board_name, board_yml, systems):
     boards = {}
     board_extensions = []
     if board_yml.is_file():
-        with board_yml.open('r') as f:
+        with board_yml.open('rb') as f:
             b = yaml.load(f.read(), Loader=SafeLoader)
 
         try:

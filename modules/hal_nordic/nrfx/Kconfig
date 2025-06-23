@@ -113,6 +113,19 @@ config NRFX_DPPI136
 	depends on $(dt_nodelabel_has_compat,dppic136,$(DT_COMPAT_NORDIC_NRF_DPPIC_GLOBAL))
 	select NRFX_DPPI
 
+config NRFX_ECB
+	bool
+
+config NRFX_ECB0
+	bool "ECB driver instance"
+	depends on $(dt_nodelabel_has_compat,ecb,$(DT_COMPAT_NORDIC_NRF_ECB))
+	select NRFX_ECB
+
+config NRFX_ECB00
+	bool "ECB00 driver instance"
+	depends on SOC_NRF54L_CPUAPP_COMMON
+	select NRFX_ECB
+
 config NRFX_EGU
 	bool
 
