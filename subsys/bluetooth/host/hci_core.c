@@ -1249,7 +1249,7 @@ static void le_conn_complete_adv_timeout(void)
 			LOG_ERR("No pending peripheral connection");
 			return;
 		}
-
+		LOG_ERR("le_conn_complete_adv_timeout");
 		conn->err = BT_HCI_ERR_ADV_TIMEOUT;
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 
