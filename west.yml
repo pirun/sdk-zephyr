@@ -23,6 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    - name: pirun
+      url-base: https://github.com/pirun
 
   group-filter: [-babblesim, -optional]
 
@@ -188,7 +190,8 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 54bde38c6f6ffb3780b26ae728cf79426184384e
+      remote: pirun
+      revision: link-x
       path: modules/hal/nordic
       groups:
         - hal
