@@ -14,6 +14,7 @@
 LOG_MODULE_REGISTER(usbd_sample_config);
 
 #define ZEPHYR_PROJECT_USB_VID		0x2fe3
+#define HP_USB_VID			0x03f0
 
 /* doc device instantiation start */
 /*
@@ -23,7 +24,7 @@ LOG_MODULE_REGISTER(usbd_sample_config);
  */
 USBD_DEVICE_DEFINE(sample_usbd,
 		   DEVICE_DT_GET(DT_NODELABEL(zephyr_udc0)),
-		   ZEPHYR_PROJECT_USB_VID, CONFIG_SAMPLE_USBD_PID);
+		   HP_USB_VID, CONFIG_SAMPLE_USBD_PID);
 /* doc device instantiation end */
 
 /* doc string instantiation start */
